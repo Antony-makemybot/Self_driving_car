@@ -114,10 +114,25 @@ Use matplotlib or cv2.imshow() to debug inference locally (or save images if run
 
 🪛 Use Roboflow to organize training and export ready-to-use models for the Pi.
 
-
+Pinout for MPU6050
 | MPU6050 Pin | Arduino Pin |
 | ----------- | ----------- |
 | VCC         | 5V          |
 | GND         | GND         |
 | SDA         | A4          |
 | SCL         | A5          |
+
+Tuning the PID Controller
+The PID constants:
+
+cpp
+Copy
+Edit
+float Kp = 0.5, Ki = 0.05, Kd = 0.1;
+can be tuned to match your motor speed and turning response. General tips:
+
+Increase Kp to make corrections more aggressive
+
+Use Ki to eliminate small steady drift
+
+Use Kd to dampen overshooting
