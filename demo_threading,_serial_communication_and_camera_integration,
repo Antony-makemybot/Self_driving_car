@@ -1,0 +1,97 @@
+import threading
+import serial
+import time
+import cv2
+
+# ========== Setup Serial Communication ==========
+try:
+    nano = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+    time.sleep(2)  # Wait for Nano to reboot
+    print("[INFO] Connected to Arduino Nano")
+except:
+    print("[ERROR] Could not connect to Nano")
+
+# ========== Shared Variables ==========
+imu_data = {}
+rpm_data = {}
+object_detected = None
+lock = threading.Lock()
+
+# ========== Serial Reading Thread ==========
+def parse_line(line):
+    if line.startswith("IMU:"):
+        parts = line.replace("IMU:", "").split(",")
+        return {"gz": float(parts[2])}
+    elif line.startswith("RPM:"):
+        parts = line.replace("RPM:", "").split(",")
+        return {"left": float(parts[0]), "right": float(parts[1])}
+    return {}
+
+def read_nano():
+    global imu_data, rpm_data
+    while True:
+        try:
+            line = nano.readline().decode().strip()
+            if not line:
+                continue
+            lock.acquire()
+            if "IMU:" in line:
+                imu_data = parse_line(line)
+            elif "RPM:" in line:
+                rpm_data = parse_line(line)
+            lock.release()
+        except Exception as e:
+            print(f"[Serial Error] {e}")
+        time.sleep(0.01)
+
+# ========== Vision Detection Thread ==========
+def dummy_yolo(frame):
+    # Fake detection: return obstacle on left or right randomly
+    import random
+    direction = random.choice(["left", "right", "center", None])
+    return direction
+
+def vision_thread():
+    global object_detected
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        direction = dummy_yolo(frame)
+        lock.acquire()
+        object_detected = direction
+        lock.release()
+        # Optional: show video
+        # cv2.imshow("Cam", frame)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
+        time.sleep(0.1)
+
+# ========== Control Decision Thread ==========
+def control_loop():
+    while True:
+        lock.acquire()
+        direction = object_detected
+        lock.release()
+
+        if direction == "left":
+            print("[CTRL] Obstacle on LEFT → Turning RIGHT")
+            nano.write(b'T30\n')
+        elif direction == "right":
+            print("[CTRL] Obstacle on RIGHT → Turning LEFT")
+            nano.write(b'T-30\n')
+        elif direction == "center":
+            print("[CTRL] Obstacle AHEAD → Stopping")
+            nano.write(b'S\n')
+        else:
+            print("[CTRL] Clear → Forward")
+            nano.write(b'F\n')
+
+        time.sleep(0.2)
+
+# ========== Thread Start ==========
+if __name__ == "__main__":
+    threading.Thread(target=read_nano, daemon=True).start()
+    threading.Thread(target=vision_thread, daemon=True).start()
+    control_loop()
