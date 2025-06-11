@@ -289,3 +289,157 @@ Inspired by open-source robotics and DIY AI community
 
 📅 Status
 Project is in early development. Hardware integration completed, basic motion verified. Vision model and smarter control logic in progress.
+
+
+# 🛣️ Phase 1 – Line Following with OpenCV and Raspberry Pi
+
+This document outlines the setup and logic for the **first phase** of the self-driving car project: using **OpenCV** on the **Raspberry Pi** to follow a white-lined black-chart road and send control commands to an **Arduino Nano**.
+
+---
+
+## 🎯 Objective
+
+Enable the car to:
+- Detect and follow the **white center and left lane lines**
+- Stay centered between them
+- Move forward continuously using only **Pi Camera + OpenCV**
+- Send commands to Nano for movement: `F`, `T-XX`, `TXX`, `S`
+
+---
+
+## 📷 Camera Setup
+
+- **Camera**: Pi Camera 2
+- **Resolution**: Full (640×480 or higher depending on your Pi)
+- **View**: Mounted slightly above, angled toward the road
+- **Frame Rate**: 15–30 FPS (depending on processing load)
+
+---
+
+## 🧱 Road Structure
+
+| Part         | Color | Description                         |
+|--------------|-------|-------------------------------------|
+| Background   | Black | Main chart base                     |
+| Left Line    | White | Continuous white strip on far left  |
+| Center Line  | White | Continuous white strip in middle    |
+| Right Line   | White | Continuous white strip on far right |
+| Lane Width   | ~car width + margins |
+| Line Width   | ~1 cm (white paper strip)
+
+---
+
+## 📐 Region of Interest (ROI) Cropping
+
+To improve performance, only the **bottom portion** of the frame is analyzed, where lines are closest to the robot.
+
+```python
+roi = frame[-100:, :]  # Crops bottom 100 pixels across full width
+Benefit	Description
+⚡ Faster	Smaller area to process
+🎯 Focused view	Detects only where robot can see road
+🧠 Easier logic	Less visual noise from sky/walls
+
+Debug Tip
+To see the ROI:
+
+python
+Copy
+Edit
+cv2.imshow("ROI", roi)
+Or draw rectangle on full image:
+
+python
+Copy
+Edit
+cv2.rectangle(frame, (0, 380), (640, 480), (0, 255, 0), 2)
+🔍 OpenCV Line Detection Logic
+Convert camera frame to grayscale.
+
+Apply binary thresholding (to isolate white lines).
+
+Crop Region of Interest (bottom 100px).
+
+Scan columns to detect:
+
+First line from left = left lane
+
+First line after center = center line
+
+Calculate midpoint between left and center line.
+
+Compare midpoint to image center (320px if width = 640).
+
+Send movement command:
+
+Offset	Command
+≈ 0 (±15px)	F (forward)
+< –15px	T-20 (left turn)
+> +15px	T20 (right turn)
+No lines found	S (stop)
+
+🧠 Raspberry Pi Responsibilities (Phase 1)
+Task	Description
+Capture Camera	Use OpenCV for video frames
+Process ROI	Apply thresholding, detect lines
+Calculate Offset	Midpoint between left + center vs image center
+Send Command	Use serial to send F, T-xx, Txx, S
+
+🧰 Arduino Nano Responsibilities (Phase 1)
+Task	Description
+Receive Serial	Parses F, T-30, T30, S
+Execute PWM	Controls motors via L298N
+Handle Turning	Uses MPU6050 gyro to rotate by angle
+Feedback (future)	Can send IMU or encoder data back to Pi
+
+🔁 Command Protocol (Pi → Nano)
+Command	Meaning
+F	Move forward
+S	Stop
+T30	Turn right 30°
+T-45	Turn left 45°
+
+Example:
+python
+Copy
+Edit
+nano.write(b'T-20\n')
+🧠 Notes on Full Resolution Use
+Use full camera resolution to clearly detect 1 cm lines.
+
+Avoid cv2.resize() unless performance suffers.
+
+Only process ROI (don’t analyze full image each frame).
+
+Use hardware acceleration (e.g. cv2.CAP_V4L2) if needed.
+
+🧩 Next Steps After Phase 1
+✅ Add feedback from Nano: gyro + encoder RPM
+
+✅ Improve turn smoothness using sensor feedback
+
+🔜 Implement obstacle detection (YOLOv5 or similar)
+
+🔜 Use full road boundaries (center + right)
+
+🔜 Add lane-change logic
+
+📁 File Suggestions
+bash
+Copy
+Edit
+/mini-self-driving-car/
+│
+├── /pi/
+│   └── line_following.py        # OpenCV script (Phase 1)
+├── /nano/
+│   └── nano_motor_control.ino   # Receives commands and turns accordingly
+└── README.md                    # This file
+🧪 Testing Tips
+Run with live cv2.imshow() to debug camera output
+
+Use slower speed (analogWrite ~ 100–120) during tuning
+
+Add arrows/text on frame to show logic decisions
+
+
