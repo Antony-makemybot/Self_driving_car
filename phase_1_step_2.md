@@ -222,3 +222,52 @@ void loop() {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+Using the full resolution of the Pi Camera is absolutely fine — and in many cases, it's actually beneficial for better line detection. But it does come with some trade-offs you should be aware of:
+
+✅ Benefits of Using Full Resolution
+Benefit	Description
+🔍 Better detail	You’ll see more of the road and better define lines (important for thin 1 cm lines)
+📏 Wider field of view	You get more of the road layout — center and side lines clearly
+🎯 Improved detection accuracy	Especially useful in low-light or if the line edges aren't sharp
+
+⚠️ Trade-Offs and Things to Handle
+Issue	Why It Happens	Solution
+⚡ Slower processing	Larger images take more CPU/RAM	Use Region of Interest (ROI) smartly — don’t process the full frame every time
+💾 More memory use	Especially if running YOLO later	Optimize with cv2.resize() just for detection, not display
+🔄 Serial lag	If you process full-res frame every frame	Use frame skipping or throttling logic (every 2nd or 3rd frame)
+
+🔧 Recommended Setup for Full-Resolution Usage
+Capture full resolution, but only analyze a strip (ROI) near the bottom.
+
+Don't shrink the frame, unless performance drops.
+
+Process only 1 or 2 ROIs for fast detection and angle calculation.
+
+✅ Example: Updated OpenCV Snippet for Full-Resolution
+python
+Copy
+Edit
+# Use full Pi camera resolution
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+# Then use only a slice (bottom 100px) for processing
+roi = binary[-100:, :]  # bottom 100 rows of full-width frame
+🧠 Bonus Tips
+💡 Try drawing the camera frame live with cv2.imshow("Full View", frame) to help calibrate.
+
+🧪 You can dynamically test how much of the image to keep as ROI.
+
+⛽ Don’t send commands every frame — only if the direction changes (saves serial bandwidth).
+
